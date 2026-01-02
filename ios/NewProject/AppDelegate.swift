@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import MMKV
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -20,6 +21,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
+
+    // Initialize MMKV
+    MMKV.initialize(rootDir: nil)
+    // Example of MMKV usage with encryption
+    // if let encryptionKey = RNCConfig.env(for: "MMKV_ENCRYPTION_KEY"),
+    //    let storageId = RNCConfig.env(for: "MMKV_STORAGE_ID"),
+    //    let encryptionKeyData = encryptionKey.data(using: .utf8) {
+      
+    //   let mmkv = MMKV(mmapID: storageId, cryptKey: encryptionKeyData, mode: .multiProcess)
+    //   let currentDate = Date()
+    //   let timestampInMilliseconds = Int64(currentDate.timeIntervalSince1970 * 1000)
+    //   let timestampString = String(timestampInMilliseconds)
+    //   mmkv?.set(timestampString, forKey: "rising-fitness-app-kill-timestamp")
+    // }
 
     window = UIWindow(frame: UIScreen.main.bounds)
 

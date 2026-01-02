@@ -2,6 +2,51 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// Load environment-specific variables from .env files
+project.ext.envConfigFiles = [
+  developmentdebug: ".env.development",
+  developmentrelease: ".env.development",
+  stagingdebug: ".env.staging",
+  stagingrelease: ".env.staging",
+  productiondebug: ".env",
+  productionrelease: ".env",
+]
+
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
+// Configure Sentry CLI to use root-level sentry.properties
+project.ext.sentryCli = [
+  sentryProperties: file("$rootDir/../sentry.properties"),
+  logLevel: "debug",
+  flavorAware: false
+]
+
+apply from: new File(["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute().text.trim(), "../sentry.gradle")
+
+// Load Sentry build plugin environment variables before applying sentry.gradle
+def sentryEnvFile = file("$rootDir/../.env.sentry-build-plugin")
+if (sentryEnvFile.exists()) {
+    sentryEnvFile.readLines().each { line ->
+        def (key, value) = line.split('=', 2) + [null, null]
+        if (key && value && !line.startsWith('#')) {
+            def trimmedKey = key.trim()
+            def trimmedValue = value.trim()
+            if (trimmedKey == "SENTRY_DISABLE_AUTO_UPLOAD") {
+                def finalValue = trimmedValue.toBoolean()
+                project.ext.shouldSentryAutoUploadGeneral = { -> !finalValue }
+                project.ext.shouldSentryAutoUploadNative = { -> !finalValue }
+                project.ext.shouldSentryAutoUpload = { ->
+                    return shouldSentryAutoUploadGeneral() && shouldSentryAutoUploadNative()
+                }
+            } else if (trimmedKey == "SENTRY_ALLOW_FAILURE") {
+                def finalValue = trimmedValue.toBoolean()
+                project.ext.shouldSentryAllowFailure = { -> finalValue }
+            }
+            logger.lifecycle("Loaded Sentry env var: ${trimmedKey}=${trimmedValue}")
+        }
+    }
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -26,6 +71,7 @@ react {
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
     // nodeExecutableAndArgs = ["node"]
+    nodeExecutableAndArgs = ["${System.env.NVM_BIN}/node"]
     //
     //   The command to run when bundling. By default is 'bundle'
     // bundleCommand = "ram-bundle"
@@ -57,7 +103,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -76,6 +122,7 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
+    flavorDimensions "default"
 
     namespace "com.newproject"
     defaultConfig {
@@ -84,15 +131,46 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        resValue "string", "build_config_package", "com.newproject"
     }
-    signingConfigs {
-        debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+
+    buildFeatures {
+        prefab true
+    }
+
+    productFlavors {
+        development {
+            resValue "string", "app_name", "New Project - Development"
+        }
+        staging {
+            resValue "string", "app_name", "New Project - Staging"
+        }
+        production {
+            resValue "string", "app_name", "New Project"
         }
     }
+
+    signingConfigs {
+        debug {
+            def keystoreFile = file(DEBUG_KEYSTORE_FILE)
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword DEBUG_KEYSTORE_PASSWORD
+                keyAlias DEBUG_KEYSTORE_ALIAS
+                keyPassword DEBUG_KEY_PASSWORD
+            }
+        }
+        release {
+            def keystoreFile = file(RELEASE_KEYSTORE_FILE)
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword RELEASE_KEYSTORE_PASSWORD
+                keyAlias RELEASE_KEYSTORE_ALIAS
+                keyPassword RELEASE_KEY_PASSWORD
+            }
+        }
+    }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
@@ -100,7 +178,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
@@ -110,6 +188,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    
+    // Add MMKV for native usage (use same version as react-native-mmkv)
+    implementation("io.github.zhongwuzw:mmkv:2.2.4")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

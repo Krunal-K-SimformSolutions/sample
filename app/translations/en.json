@@ -1,0 +1,16 @@
+{
+  "common": {
+    "dash": "-",
+    "err": "Error",
+    "errUnexpected": "An unexpected error occurred",
+    "errPermissionNotGranted": "Permission(s) {{list}} not granted",
+    "errUrlNotSupported": "This device cannot open the specified link. Please check the URL or try again later",
+    "errUrlNotOpened": "Something went wrong while trying to open the link",
+    "errRequireEmail": "Please enter your email address",
+    "errValidEmail": "Please enter a valid email address",
+    "errValidPassword": "Please enter your password"
+  },
+  "auth": {},
+  "home": {},
+  "other": {}
+}
